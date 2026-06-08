@@ -222,11 +222,10 @@ $RECYCLE.BIN/
 *~
 
 .DS_Store
-programs/qualimap_v2.3/
-programs/Trimmomatic-0.39/
 programs/ucsc_tools/
+!programs/qualimap_v2.3/lib/
+!programs/qualimap_v2.3/lib/**
 programs/*.zip
 programs/*.gz
 /refGenome/**/*
 !/refGenome/**/
-
