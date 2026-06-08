@@ -8,6 +8,7 @@ Two main entry points are provided:
 - `pipeline_chip.sh` for ChIP-seq  
 
 Each pipeline orchestrates a series of modular scripts located in the `bin/` directory.
+Release notes are tracked in `CHANGELOG.md`.
 
 ![Python](https://img.shields.io/badge/Python-3.10-blue?logo=python) ![micromamba](https://img.shields.io/badge/micromamba-env-green?logo=anaconda) ![conda-forge](https://img.shields.io/badge/channel-conda--forge-orange?logo=conda-forge) ![status](https://img.shields.io/badge/status-stable-green)
 
@@ -31,7 +32,8 @@ Each pipeline orchestrates a series of modular scripts located in the `bin/` dir
 │   ├── filterQCChip.sh
 │   ├── convertingBEDChip.sh
 │   ├── macs2Chip.sh
-│   └── generate_reportChip.sh
+│   ├── generate_reportChip.sh
+│   └── resource_utils.sh
 ├── refGenome/
 │   ├── hisat2_index/
 │   │   └── os_IRGSP/
@@ -228,6 +230,9 @@ The script will ask for:
 - Thread count
 - Whether to run HTSeq
 
+Paths beginning with `~/` are expanded to the user's home directory. The requested thread count is also checked against local CPU and memory capacity; if it is too high for the machine, the pipeline automatically lowers the thread count and sets a safer `samtools sort -m` value.
+The same resource safety checks are used by the modular scripts in `bin/`, so direct step-level execution follows the same CPU and memory policy.
+
 Outputs are written to `<experiment_name>/`.
 
 ---
@@ -257,6 +262,9 @@ The script will ask for:
 - Assay type (TF or histone)
 - Thread count
 - Whether to run MACS2
+
+Paths beginning with `~/` are expanded to the user's home directory. The requested thread count is also checked against local CPU and memory capacity; if it is too high for the machine, the pipeline automatically lowers the thread count and sets a safer `samtools sort -m` value.
+The same resource safety checks are used by the modular scripts in `bin/`, so direct step-level execution follows the same CPU and memory policy.
 
 ---
 

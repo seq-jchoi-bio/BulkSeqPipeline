@@ -10,6 +10,7 @@ set -o pipefail
 # -----------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+source "${REPO_ROOT}/bin/resource_utils.sh"
 
 # Tools (repo-relative)
 QUALIMAP_BIN="${REPO_ROOT}/programs/qualimap_v2.3/qualimap"
@@ -26,6 +27,7 @@ if [ ! -f "$BAMF" ]; then
 fi
 
 CPU_IN=${2:-2}
+SORT_MEM=${3:-}
 
 # -----------------------
 # Variables
@@ -37,7 +39,9 @@ DBAMF="${EXPNAME}.flt.rd.bam"
 METRICF="${EXPNAME}.flt.rd.metric.txt"
 OUTQC="${EXPNAME}_QC"
 
-SAMCPUS="$CPU_IN"
+prepare_resource_settings "$CPU_IN" "ChIP filtering/QC" "$SORT_MEM"
+SAMCPUS="$RESOURCE_SORT_THREADS"
+SORT_MEM="$RESOURCE_SORT_MEM"
 MAPQ="${MAPQ_CUTOFF:-20}"
 
 # -----------------------
@@ -61,10 +65,11 @@ echo "  IN      : $BAMF"
 echo "  TMP     : $TBAMF"
 echo "  SORTED  : $SBAMF"
 echo "  Threads : $SAMCPUS"
+echo "  Sort memory/thread: $SORT_MEM"
 echo "=========================================="
 
 samtools view -@ "$SAMCPUS" -b -q "$MAPQ" "$BAMF" > "$TBAMF"
-samtools sort -@ "$SAMCPUS" -O BAM -o "$SBAMF" "$TBAMF"
+samtools sort -@ "$SAMCPUS" -m "$SORT_MEM" -O BAM -o "$SBAMF" "$TBAMF"
 samtools index "$SBAMF"
 
 # -----------------------

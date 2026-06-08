@@ -4,6 +4,11 @@
 set -o errexit
 set -o nounset
 
+# Resolve repository root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+source "${REPO_ROOT}/bin/resource_utils.sh"
+
 # Arguments
 SEQF1=$1        # Trimmed R1 fastq.gz
 SEQF2=$2        # Trimmed R2 fastq.gz
@@ -12,8 +17,9 @@ OUTBAMF=$4      # Output BAM file
 CPU_IN=${5:-2}
 
 # Threads (adjustable)
-NCPUS="$CPU_IN"
-SAMCPUS="$CPU_IN"
+prepare_resource_settings "$CPU_IN" "RNA HISAT2"
+NCPUS="$RESOURCE_CPU"
+SAMCPUS="$RESOURCE_CPU"
 
 # Check inputs
 if [ ! -f "$SEQF1" ]; then
@@ -36,10 +42,10 @@ mkdir -p "$(dirname "$OUTBAMF")"
 
 # Run HISAT2 + BAM conversion
 hisat2 \
-    -p $NCPUS \
+    -p "$NCPUS" \
     -x "$IDXPREFIX" \
     -1 "$SEQF1" \
     -2 "$SEQF2" \
-| samtools view -@ $SAMCPUS -b - > "$OUTBAMF"
+| samtools view -@ "$SAMCPUS" -b - > "$OUTBAMF"
 
 echo "HISAT2 mapping finished: $OUTBAMF"

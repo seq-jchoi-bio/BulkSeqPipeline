@@ -11,6 +11,7 @@ set -o pipefail
 BAMF="${1:?Error: missing input BAM (*.bam)}"
 genome="${2:?Error: missing genome prefix (e.g., os*, hs*, ms*)}"
 CPU_IN=${3:-2}
+SORT_MEM=${4:-}
 
 if [ ! -f "$BAMF" ]; then
     echo "Error: Input BAM does not exist: $BAMF"
@@ -21,7 +22,12 @@ fi
 # Variables
 # -----------------------
 bedgz="${BAMF%.bam}.bed.gz"
-SAMCPUS="$CPU_IN"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+source "${REPO_ROOT}/bin/resource_utils.sh"
+prepare_resource_settings "$CPU_IN" "ChIP BAM to BED" "$SORT_MEM"
+SAMCPUS="$RESOURCE_SORT_THREADS"
+SORT_MEM="$RESOURCE_SORT_MEM"
 
 # -----------------------
 # Checks
@@ -37,6 +43,7 @@ echo "  BAM     : $BAMF"
 echo "  Genome  : $genome"
 echo "  BED.GZ  : $bedgz"
 echo "  Threads : $SAMCPUS"
+echo "  Sort memory/thread: $SORT_MEM"
 echo "=========================================="
 
 # -----------------------
@@ -44,7 +51,7 @@ echo "=========================================="
 # -----------------------
 if [[ "$genome" == os* ]]; then
     # NOTE: Use name-sorted stream for bamToBed
-    samtools sort -@ "$SAMCPUS" -n -m 2G -O BAM "$BAMF" \
+    samtools sort -@ "$SAMCPUS" -n -m "$SORT_MEM" -O BAM "$BAMF" \
     | bamToBed -i - \
     | awk -v OFS="\t" '
     BEGIN {
@@ -73,7 +80,7 @@ if [[ "$genome" == os* ]]; then
     | gzip -c > "$bedgz"
 
 elif [[ "$genome" == hs* || "$genome" == ms* ]]; then
-    samtools sort -@ "$SAMCPUS" -n -m 2G -O BAM "$BAMF" \
+    samtools sort -@ "$SAMCPUS" -n -m "$SORT_MEM" -O BAM "$BAMF" \
     | bamToBed -i - \
     | awk -v OFS="\t" '
         $1 !~ /^chrM$/ && $1 !~ /_/ { print $0; }

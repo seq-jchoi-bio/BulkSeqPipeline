@@ -18,6 +18,7 @@ CPU_IN=${4:-2}
 # -----------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+source "${REPO_ROOT}/bin/resource_utils.sh"
 
 TRIMMOMATIC_JAR="${REPO_ROOT}/programs/Trimmomatic-0.39/trimmomatic-0.39.jar"
 ADAPTERLC="${REPO_ROOT}/programs/Trimmomatic-0.39/adapters/TruSeq3-PE.fa"
@@ -30,7 +31,8 @@ LEAD="3"
 TRAIL="3"
 WINDOW="4:15"
 LENGTH="36"
-TCORE="$CPU_IN"
+prepare_resource_settings "$CPU_IN" "ChIP Trimmomatic"
+TCORE="$RESOURCE_CPU"
 
 # -----------------------
 # Checks

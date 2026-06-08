@@ -5,7 +5,7 @@ set -o nounset
 set -o pipefail
 
 start_time=$(date "+%a %b %d %I:%M:%S %p %Z %Y")
-VERSION=2026.01
+VERSION=2026.02
 
 HEADER="\n ==========================================="
 HEADER+="\n   A Standard ChIP-Seq Pipeline"
@@ -15,10 +15,17 @@ HEADER+="\n   Contact: jchoi@inha.ac.kr"
 HEADER+="\n ==========================================="
 echo -e "$HEADER"
 
+# Resolve repository root (main script is placed at repo root)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="${SCRIPT_DIR}"
+source "${REPO_ROOT}/bin/resource_utils.sh"
+
 printf "\n"
 read -e -p "   1. Enter path to forward file (*.fastq.gz): " file1
+file1="$(expand_input_path "$file1")"
 printf "\n"
 read -e -p "   2. Enter path to reverse file (*.fastq.gz): " file2
+file2="$(expand_input_path "$file2")"
 printf "\n"
 read -e -p "   3. Enter genome prefix name (no path, auto-detection): " genome
 printf "\n"
@@ -39,11 +46,8 @@ echo "==========================================="
 echo "   System resource status"
 echo "==========================================="
 
-if command -v nproc >/dev/null 2>&1; then
-  cpu_total="$(nproc)"
-else
-  cpu_total="$(getconf _NPROCESSORS_ONLN)"
-fi
+cpu_total="$(detect_cpu_total)"
+mem_total_mb="$(detect_memory_mb)"
 echo "   - CPU threads available: ${cpu_total}"
 
 if command -v free >/dev/null 2>&1; then
@@ -51,10 +55,8 @@ if command -v free >/dev/null 2>&1; then
   free -h
 else
   if command -v sysctl >/dev/null 2>&1; then
-    mem_bytes="$(sysctl -n hw.memsize 2>/dev/null || echo 0)"
-    if [[ "$mem_bytes" -gt 0 ]]; then
-      mem_gb="$(( mem_bytes / 1024 / 1024 / 1024 ))"
-      echo "   - Memory total: ~${mem_gb} GB"
+    if [[ "$mem_total_mb" -gt 0 ]]; then
+      echo "   - Memory total: ~$(format_memory_gb "$mem_total_mb") GB"
     fi
   fi
 fi
@@ -71,9 +73,27 @@ while true; do
 done
 printf "\n"
 
-# Resolve repository root (main script is placed at repo root)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="${SCRIPT_DIR}"
+requested_cpu="$cpu"
+optimize_resources "$requested_cpu" "$cpu_total" "$mem_total_mb"
+cpu="$OPT_CPU"
+sort_cpu="$OPT_SORT_THREADS"
+sort_mem="$OPT_SORT_MEM"
+
+if [ "$requested_cpu" -ne "$cpu" ]; then
+    echo "==========================================="
+    echo "   Resource adjustment"
+    echo "==========================================="
+    echo "   Requested ${requested_cpu} threads, but this system does not have enough safe memory for that setting."
+    echo "   The pipeline automatically selected safer parameters for a personal workstation:"
+    echo "   - Pipeline threads: ${cpu}"
+    echo "   - samtools sort threads: ${sort_cpu}"
+    echo "   - samtools sort memory per thread: ${sort_mem}"
+    echo "==========================================="
+    printf "\n"
+else
+    echo "   Resource setting: ${cpu} threads, samtools sort -@ ${sort_cpu} -m ${sort_mem}"
+    printf "\n"
+fi
 
 # Check input FASTQs
 if [ ! -f "$file1" ]; then
@@ -118,7 +138,10 @@ if [ "$peak_detection" == "yes" ]; then
             continue
         fi
 
-        inputBed="$(pwd)/$inputBed"
+        inputBed="$(expand_input_path "$inputBed")"
+        if [[ "$inputBed" != /* ]]; then
+            inputBed="$(pwd)/$inputBed"
+        fi
         inputExp="$(basename "$inputBed")"
         inputPath="$inputBed/$inputExp.flt.rd.bed.gz"
 
@@ -167,6 +190,7 @@ fi
 echo -e "\n     - Pipeline log files will be stored in: ${outdir}/log"
 echo -e "\n     - The final report will be generated in: ${outdir}/pipeline_summary.txt"
 echo -e "\n     - Threads to use: ${cpu}"
+echo -e "\n     - samtools sort: -@ ${sort_cpu} -m ${sort_mem}"
 echo "==========================================="
 
 # 1. Trimming and QC (local)
@@ -193,7 +217,7 @@ echo "=========================================="
 echo -e "\n =========================================="
 echo "   Running: filterQCChip.sh"
 echo "=========================================="
-bash "${SCRIPTDIR}/filterQCChip.sh" "${bamfile}" "${cpu}" \
+bash "${SCRIPTDIR}/filterQCChip.sh" "${bamfile}" "${sort_cpu}" "${sort_mem}" \
   2>&1 | tee "${logdir}/03_filterQC.log"
 echo -e "\n =========================================="
 echo "   Done: filterQCChip.sh"
@@ -203,7 +227,7 @@ echo "=========================================="
 echo -e "\n =========================================="
 echo "   Running: convertingBEDChip.sh"
 echo "=========================================="
-bash "${SCRIPTDIR}/convertingBEDChip.sh" "${fbamfile}" "${genome}" "${cpu}" \
+bash "${SCRIPTDIR}/convertingBEDChip.sh" "${fbamfile}" "${genome}" "${sort_cpu}" "${sort_mem}" \
   2>&1 | tee "${logdir}/04_bed.log"
 echo -e "\n =========================================="
 echo "   Done: convertingBEDChip.sh"

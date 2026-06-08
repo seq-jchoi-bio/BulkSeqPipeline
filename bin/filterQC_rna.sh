@@ -7,6 +7,7 @@ set -o nounset
 # Resolve repository root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+source "${REPO_ROOT}/bin/resource_utils.sh"
 
 # Tools
 QUALIMAP_BIN="${REPO_ROOT}/programs/qualimap_v2.3/qualimap"
@@ -15,9 +16,12 @@ PICARD_JAR="${REPO_ROOT}/programs/picard/picard.jar"
 # Argument
 BAMF=$1
 CPU_IN=${2:-2}
+SORT_MEM=${3:-}
 
 # Parameters
-SAMCPUS="$CPU_IN"
+prepare_resource_settings "$CPU_IN" "RNA filtering/QC" "$SORT_MEM"
+SAMCPUS="$RESOURCE_SORT_THREADS"
+SORT_MEM="$RESOURCE_SORT_MEM"
 MAPQ=20
 
 # Checks
@@ -46,8 +50,15 @@ METRICF="${EXPNAME}.flt.rd.metric.txt"
 OUTQC="${EXPNAME}_QC"
 
 # Filtering by MAPQ and coordinate sorting
+echo "=========================================="
+echo "Filtering (MAPQ >= ${MAPQ}) and sorting"
+echo "  IN                : $BAMF"
+echo "  Threads           : $SAMCPUS"
+echo "  Sort memory/thread: $SORT_MEM"
+echo "=========================================="
+
 samtools view -@ "$SAMCPUS" -b -q "$MAPQ" "$BAMF" > "$TBAMF"
-samtools sort -@ "$SAMCPUS" -O BAM -o "$IBAMF" "$TBAMF"
+samtools sort -@ "$SAMCPUS" -m "$SORT_MEM" -O BAM -o "$IBAMF" "$TBAMF"
 
 # Remove duplicates (Picard via jar)
 java -jar "$PICARD_JAR" MarkDuplicates \
@@ -57,7 +68,7 @@ java -jar "$PICARD_JAR" MarkDuplicates \
     REMOVE_DUPLICATES=true
 
 # Name-sort for counting
-samtools sort -@ "$SAMCPUS" -n -O BAM -o "$DBAMF" "$SBAMF"
+samtools sort -@ "$SAMCPUS" -m "$SORT_MEM" -n -O BAM -o "$DBAMF" "$SBAMF"
 
 # Collect BAM stats
 samtools stats "$BAMF"  > "${EXPNAME}.samstats.txt"

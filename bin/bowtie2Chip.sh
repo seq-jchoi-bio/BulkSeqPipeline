@@ -6,6 +6,13 @@ set -o nounset
 set -o pipefail
 
 # -----------------------
+# Resolve repository root
+# -----------------------
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+source "${REPO_ROOT}/bin/resource_utils.sh"
+
+# -----------------------
 # Inputs
 # -----------------------
 SEQF1="${1:?Error: missing trimmed R1 fastq.gz}"
@@ -18,8 +25,9 @@ CPU_IN=${6:-2}
 # -----------------------
 # Resources
 # -----------------------
-NCPUS="$CPU_IN"
-SAMCPUS="$CPU_IN"
+prepare_resource_settings "$CPU_IN" "ChIP Bowtie2"
+NCPUS="$RESOURCE_CPU"
+SAMCPUS="$RESOURCE_CPU"
 
 # -----------------------
 # Checks
